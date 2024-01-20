@@ -10,18 +10,15 @@
 #include <unistd.h>
 #include "uart.h"
 #include <time.h>
+#include "log.h"
+
+#define printf Dbuginfo
 
 #define MAILTXT "/root/mail.txt"
 #define DSC_to_msg(DSC) (DSC == 0 ? "Bit7" : (DSC == 1 ? "Bit8" : "UCS2"))
 char *mailmsghead = "From: 15217681799 <w15217681799@163.com>\nTo: 远行 <3253941815@qq.com>\nSubject: sms to mail\n";
 char *KeyVal;
-char *curlcmd = "curl --verbose \
-                      --ssl-reqd --url \"smtp://smtp.163.com\" \
-                      --mail-from \"w15217681799@163.com\" \
-                      --mail-rcpt \"3253941815@qq.com\" \
-                      --upload-file /root/mail.txt \
-                      --cacert \"/root/cacert.pem\" \
-                      --user \"w15217681799@163.com:";
+char *curlcmd = "curl --verbose --ssl-reqd --url \"smtp://smtp.163.com\" --mail-from \"w15217681799@163.com\" --mail-rcpt \"3253941815@qq.com\" --upload-file /root/mail.txt --cacert \"/root/cacert.pem\" --user \"w15217681799@163.com:";
 
 
 void write_sms_txt(struct SMS_Struct *sms)
@@ -77,18 +74,52 @@ void send_mail_curl()
     printf("cmd:%s\n",popencmd);
     FILE* p_file = popen(popencmd,"r");
     if (!p_file) {  
-        fprintf(stderr, "Erro to popen");  
+        printf("Error to popen\n");  
     }  
   
     while (fgets(buf, 1024, p_file) != NULL) {
-        printf("%s", buf);  
+        printf("%s", buf);
     }  
     pclose(p_file);
 }
 
-
-int main()
+char* get_AT_ttyUSB(void)
 {
+    int ret;
+    static char buf[32];
+    buf[0] = 0;
+    FILE *getttycmd = popen("echo `ls /dev/ttyUSB*` | awk '{print $1}'","r");
+    ret = fread(buf,1,32,getttycmd);
+    pclose(getttycmd);
+    if(ret<4)
+        return NULL;
+    else
+        return buf;
+}
+
+int main(int argc, char *argv[])
+{
+    Dbuginit("/root/log.txt");
+    printf("App start\n");
+
+    char *ttydev;
+    // ttydev = get_AT_ttyUSB();
+    // if(ttydev==NULL)
+    // {
+    //     printf("AT tty dev not find \n");
+    //     return -1;
+    // }
+    // printf("AT TTY is = %s strlen = %d\n",ttydev,strlen(ttydev));
+    
+    if(argc < 2)
+    {
+        printf("you maybe use args ./smsmail /dev/ttyUSB2\n");
+        return -1;
+    }
+    ttydev = argv[1];
+    printf("AT TTY is = %s strlen = %d\n",ttydev,strlen(ttydev));
+
+
      // 获取环境变量的值
     KeyVal = getenv("EMAILKEYVAL");
     if(KeyVal==NULL)
@@ -96,7 +127,7 @@ int main()
         printf("env EMAILKEYVAL not found\n");
         return -1;
     }
-    int uartfd = uart_open("/dev/ttyUSB2",115200,'N',8,1);
+    int uartfd = uart_open(ttydev,115200,'N',8,1);
     int ret;
     char recvbuf[1024],pbuf[1024];
     char *p;
@@ -111,7 +142,7 @@ int main()
             printf("recv data error:%s\n",strerror(errno));
             break;
         }
-        else
+        else if(ret>0)
         {
             printf("ret = %d recv data success:\n%s\n",ret ,recvbuf);
             if(strstr(recvbuf,"+CMTI:")!=NULL)

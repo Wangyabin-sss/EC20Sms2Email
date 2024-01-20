@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <errno.h>
+#include "log.h"
+
+#define printf Dbuginfo
 
 /*******************************************************************************
  *
