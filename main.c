@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "SMS.h"
 #include <locale.h>
 #include "utf.h"
@@ -135,7 +136,7 @@ int main(int argc, char *argv[])
 
     while(1)
     {
-        recvbuf[0]=0;
+		memset(recvbuf,0,1024);
         ret = uart_recv(uartfd, recvbuf, 1024);
         if(ret==-1)
         {
@@ -156,7 +157,9 @@ int main(int argc, char *argv[])
             {
                 p = strstr(p,"\n");
                 strcpy(pbuf,p+1);
-                pbuf[strlen(pbuf)-2]=0;
+				p = strstr(pbuf,"\r\n");
+				if(p!=NULL)
+                	*p=0;
                 printf("pdu msg:%s\n",pbuf);
                 sms = PDUDecoding(pbuf);
                 write_sms_txt(&sms);
