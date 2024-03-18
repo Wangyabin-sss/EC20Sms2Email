@@ -164,13 +164,6 @@ int main(int argc, char *argv[])
                 sms = PDUDecoding(pbuf);
                 write_sms_txt(&sms);
                 send_mail_curl();
-                // system("curl --verbose \
-                //         --ssl-reqd --url \"smtp://smtp.163.com\" \
-                //         --mail-from \"w15217681799@163.com\" \
-                //         --mail-rcpt \"3253941815@qq.com\" \
-                //         --upload-file /root/mail.txt \
-                //         --user \"w15217681799@163.com:KWTXQFWFABYYNFUL\" \
-                //         --cacert \"/root/cacert.pem\"");
                 free_sms_data(&sms);
             }
         }
