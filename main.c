@@ -14,10 +14,12 @@
 #include "log.h"
 
 #define printf Dbuginfo
-
+#define SMSMAXNUMS      35      //达到这个数据量就转储到文件，从ec20中删除信息
+#define RECVBUFFERSIZE  1024    //串口接收数据缓存区大小
 #define MAILTXT "/root/mail.txt"
+#define SMSHISTORYTXT "/root/smsHistory.txt"
 #define DSC_to_msg(DSC) (DSC == 0 ? "Bit7" : (DSC == 1 ? "Bit8" : "UCS2"))
-char *mailmsghead = "From: 15217681799 <w15217681799@163.com>\nTo: 远行 <3253941815@qq.com>\nSubject: sms to mail\n";
+char *mailmsghead = "From: 15217681799 <w15217681799@163.com>\nTo: 远行 <3253941815@qq.com>\nSubject: sms to mail\n";  //邮件格式头
 char *KeyVal;
 char *curlcmd = "curl --verbose --ssl-reqd --url \"smtp://smtp.163.com\" --mail-from \"w15217681799@163.com\" --mail-rcpt \"3253941815@qq.com\" --upload-file /root/mail.txt --cacert \"/root/cacert.pem\" --user \"w15217681799@163.com:";
 
@@ -84,19 +86,19 @@ void send_mail_curl()
     pclose(p_file);
 }
 
-char* get_AT_ttyUSB(void)
-{
-    int ret;
-    static char buf[32];
-    buf[0] = 0;
-    FILE *getttycmd = popen("echo `ls /dev/ttyUSB*` | awk '{print $1}'","r");
-    ret = fread(buf,1,32,getttycmd);
-    pclose(getttycmd);
-    if(ret<4)
-        return NULL;
-    else
-        return buf;
-}
+// char* get_AT_ttyUSB(void)
+// {
+//     int ret;
+//     static char buf[32];
+//     buf[0] = 0;
+//     FILE *getttycmd = popen("echo `ls /dev/ttyUSB*` | awk '{print $1}'","r");
+//     ret = fread(buf,1,32,getttycmd);
+//     pclose(getttycmd);
+//     if(ret<4)
+//         return NULL;
+//     else
+//         return buf;
+// }
 
 int main(int argc, char *argv[])
 {
@@ -130,14 +132,15 @@ int main(int argc, char *argv[])
     }
     int uartfd = uart_open(ttydev,115200,'N',8,1);
     int ret;
-    char recvbuf[1024],pbuf[1024];
+    char recvbuf[RECVBUFFERSIZE],pbuf[RECVBUFFERSIZE];
     char *p;
     struct SMS_Struct sms;
+    int smsnumid=0;
 
     while(1)
     {
-		memset(recvbuf,0,1024);
-        ret = uart_recv(uartfd, recvbuf, 1024);
+		memset(recvbuf,0,RECVBUFFERSIZE);
+        ret = uart_recv(uartfd, recvbuf, RECVBUFFERSIZE);
         if(ret==-1)
         {
             printf("recv data error:%s\n",strerror(errno));
@@ -149,8 +152,9 @@ int main(int argc, char *argv[])
             if(strstr(recvbuf,"+CMTI:")!=NULL)
             {
                 p = strstr(recvbuf,",");
-                sprintf(pbuf,"AT+CMGR=%d\r\n",atoi(p+1));
-                printf("cmd=%s\n",pbuf);
+                smsnumid = atoi(p+1);
+                sprintf(pbuf,"AT+CMGR=%d\r\n",smsnumid);
+                printf("send cmd=%s\n",pbuf);
                 uart_send(uartfd, pbuf, strlen(pbuf));
             }
             else if((p = strstr(recvbuf,"+CMGR:"))!=NULL)
@@ -165,7 +169,28 @@ int main(int argc, char *argv[])
                 write_sms_txt(&sms);
                 send_mail_curl();
                 free_sms_data(&sms);
+
+                if(smsnumid >= SMSMAXNUMS)
+                {
+                    sprintf(pbuf,"AT+CMGL=4\r\n");
+                    printf("send cmd=%s\n",pbuf);
+                    uart_send(uartfd, pbuf, strlen(pbuf));
+                }
             }
+            else if(strstr(recvbuf,"+CMGL:")!=NULL)
+            {
+                FILE *file = fopen(SMSHISTORYTXT,"a");
+                fwrite(recvbuf,1,ret,file);
+                fclose(file);
+                if(strstr(recvbuf,"OK\r\n")!=NULL)
+                {
+                    sprintf(pbuf,"AT+CMGD=1,4\r\n");
+                    printf("send cmd=%s\n",pbuf);
+                    uart_send(uartfd, pbuf, strlen(pbuf));
+                }
+            }
+			if(ret == RECVBUFFERSIZE)
+				continue;
         }
         sleep(3);
     }
