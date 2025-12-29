@@ -3,5 +3,5 @@
 
 make
 
-./smsmail /dev/ttyUSB2
+./run.sh 
 
