@@ -22,6 +22,7 @@
 char *mailmsghead = "From: 15217681799 <w15217681799@163.com>\nTo: 远行 <3253941815@qq.com>\nSubject: sms to mail\n";  //邮件格式头
 char *KeyVal;
 char *curlcmd = "curl --verbose --ssl-reqd --url \"smtp://smtp.163.com\" --mail-from \"w15217681799@163.com\" --mail-rcpt \"3253941815@qq.com\" --upload-file /root/mail.txt --cacert \"/root/cacert.pem\" --user \"w15217681799@163.com:";
+char *curlcmd1 = "curl --verbose --ssl-reqd --url \"smtp://smtp.163.com\" --mail-from \"w15217681799@163.com\" --mail-rcpt \"2644216261@qq.com\" --upload-file /root/mail.txt --cacert \"/root/cacert.pem\" --user \"w15217681799@163.com:";
 
 
 void write_sms_txt(struct SMS_Struct *sms)
@@ -67,11 +68,11 @@ void free_sms_data(struct SMS_Struct *sms)
     }
 }
 
-void send_mail_curl()
+void send_mail_curl(char *curltmpcmd)
 {
     char popencmd[512];
     char buf[1024];
-    strcpy(popencmd,curlcmd);
+    strcpy(popencmd,curltmpcmd);
     strcat(popencmd,KeyVal);
     strcat(popencmd,"\"");
     printf("cmd:%s\n",popencmd);
@@ -167,16 +168,18 @@ int main(int argc, char *argv[])
                 printf("pdu msg:%s\n",pbuf);
                 sms = PDUDecoding(pbuf);
                 write_sms_txt(&sms);
-                send_mail_curl();
+                send_mail_curl(curlcmd);
+                send_mail_curl(curlcmd1);
                 free_sms_data(&sms);
 
                 if(smsnumid >= SMSMAXNUMS)
                 {
-                    sprintf(pbuf,"AT+CMGL=4\r\n");
+                    sprintf(pbuf,"AT+CMGD=1,4\r\n");//delete all message
                     printf("send cmd=%s\n",pbuf);
                     uart_send(uartfd, pbuf, strlen(pbuf));
                 }
             }
+			/*
             else if(strstr(recvbuf,"+CMGL:")!=NULL)
             {
                 FILE *file = fopen(SMSHISTORYTXT,"a");
@@ -189,6 +192,7 @@ int main(int argc, char *argv[])
                     uart_send(uartfd, pbuf, strlen(pbuf));
                 }
             }
+			*/
 			if(ret == RECVBUFFERSIZE)
 				continue;
         }
